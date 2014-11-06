@@ -8,6 +8,8 @@ using namespace std;
 
 int num_queues=0;
 int ageing_time=0;
+float scheduled=0;
+float wait_time=0;
 
 typedef struct process {
   int p_id;
@@ -81,15 +83,32 @@ void organizeArrivals(vector<process> *chunk_to_arrive) {
   sort (chunk_to_arrive->begin(), chunk_to_arrive->end(), sortArrivals);
 }
 
-//method for ageing the entire data structure(s) (need to rewrite because ageing happens everywhere cept queue 0)
+//method for ageing the entire data structure(s) (need to rewrite because ageing happens everywhere cept queue 0... )
 void ageing(rr_queue *queues, fcfs_queue *final, int tick) {
   process tmp;
-  int length = queues->rr.size();
-  while(final->fcfs.front().timeleft == tick) {
-    memcpy(&final->fcfs.front(), &tmp, sizeof final->fcfs);
-    final->fcfs.pop();
-    queues[length].rr.push(tmp);
+  if(final->fcfs.size() > 0) {
+    while(final->fcfs.front().trigger_age_up == tick) {
+      tmp = final->fcfs.front();
+    
+      cout << "aged up process: " << tmp.p_id << " from queue 2 to queue: " << num_queues-1 << '\n';
+      final->fcfs.pop();
+      tmp.trigger_age_up = tmp.trigger_age_up + tick;
+      queues[num_queues-1].rr.push(tmp);
+    }
   }
+  //start at 2 to avoid messing with queue 0 (for loop)
+  /*if(num_queues>2) {
+    for(int i=2; i<(num_queues-1); ++i) {
+      if(queues[i].rr.size() > 0) {
+        while(queues[i].rr.front().trigger_age_up == tick) {
+          memcpy(&queues[i].rr.front(), &tmp, sizeof queues[i].rr);
+          cout << "aged up process from middle queues: " << tmp.p_id << '\n';
+          tmp.trigger_age_up = tmp.trigger_age_up + tick;
+          queues[num_queues-i].rr.push(tmp);
+        }
+      }
+    } 
+  }*/
 }
 
 //method for demoting a process
@@ -102,6 +121,8 @@ void demote(rr_queue *queues, fcfs_queue *final, int tick, int que_val, process 
   //check if process is demoted to fcfs queue
   if((que_val+1) == num_queues) {
     final->fcfs.push(*being_demoted);
+  } else if((que_val+1) == num_queues+1) {
+    final->fcfs.push(*being_demoted); //but not really!
   } else {
     queues[que_val+1].rr.push(*being_demoted);
   }
@@ -120,6 +141,9 @@ void checkQueue(rr_queue *queues) {
 
 int main() {
 
+  //int scheduled;
+  //int wait_time;
+
   int slice = 8;
   int processor_slice=0;
   bool processing = false;
@@ -132,7 +156,7 @@ int main() {
   rr_queue q2; q2.quantum = (slice*2);
   fcfs_queue q3; q3.quantum = (slice*3);
   num_queues = 2;
-  ageing_time = 50;
+  ageing_time = 40;
    
 
   //array to hold our ready queues
@@ -140,9 +164,9 @@ int main() {
 
   process p0 = {1, 8, 0, 23, 8, 0};
   process p1 = {2, 4, 34, 17, 4, 0};
-  process p2 = {3, 56, 2, 5, 56, 0};
-  process p3 = {4, 32, 15, 3, 32, 0};
-  process p4 = {5, 44, 15, 8, 44, 0};
+  process p2 = {3, 109, 2, 5, 109, 0};
+  process p3 = {4, 200, 15, 3, 200, 0};
+  process p4 = {5, 130, 15, 8, 130, 0};
   
   vector<process> arrivals(5);
   arrivals[0] = p0;
@@ -157,7 +181,7 @@ int main() {
 
   //while master vector still has processes to be pushed to the ready queue
   while(process_count != 0) {
-    //cout << "am i stuck?" << '\n';
+    //cout << "amount of processes to process left: " << process_count << '\n';
     if(arrivals.size() != 0) {
       if(arrivals.begin()->arrival == tick) {
         pending_arrival = true;
@@ -173,35 +197,36 @@ int main() {
     //push the stuff thats arrived to the ready_queue
     if(pending_arrival) {
       for(vector<process>::iterator it=chunk_to_arrive.begin(); it!=chunk_to_arrive.end(); ++it) {
-        cout << "what were pushin... " << it->p_id << '\n';
+        cout << "what were pushin... " << it->p_id << " with burst of: " << it->timeleft << '\n';
         queues[0].rr.push(*it);
         cout << "clock tick when we push to the queue: " << tick << '\n';
       }
       chunk_to_arrive.clear();    
     }
 
-    //if the process is free:
+    //if the processor is free:
     //cout << "status of processing: " << processing << '\n';
     if(!processing and process_count != 0) {
-      cout << "about to enter the VOID1 " << queues[0].rr.front().p_id << '\n';
-      cout << "clock tick: " << tick << '\n';
+      //cout << "about to enter the VOID1 " << queues[0].rr.front().p_id << '\n';
+      //cout << "clock tick: " << tick << '\n';
       //cout << "processor count is: " << process_count << '\n';
       //age up
+      ageing(queues, &q3, tick);
       //check every queue for a process... execute the first one we find
       curr_queue=0;
       int temp=0;
       bool stop=false;
-      cout << "about to enter the VOID2 " << queues[0].rr.front().p_id << '\n';
+      //cout << "about to enter the VOID2 " << queues[0].rr.front().p_id << '\n';
       //checkQueue(queues);  
       do {
-        cout << "about to enter the VOID3 " << queues[0].rr.front().p_id << '\n'; 
+        //cout << "about to enter the VOID3 " << queues[0].rr.front().p_id << '\n'; 
         if(queues[temp].rr.size() > 0) {
-          cout << "wormhole..." <<  '\n';
+          //cout << "wormhole..." <<  '\n';
           processing = true;
           curr_queue = temp;
           being_processed = queues[curr_queue].rr.front();
-          cout << "lol " << queues[curr_queue].rr.front().p_id << '\n';
-          cout << "being_processed found: " << being_processed.p_id << '\n';
+          //cout << "lol " << queues[curr_queue].rr.front().p_id << '\n';
+          //cout << "being_processed found: " << being_processed.p_id << '\n';
           queues[curr_queue].rr.pop();
         }
         ++temp;
@@ -214,38 +239,56 @@ int main() {
         processing = true;
         being_processed = queues[curr_queue].rr.front();
         queues[curr_queue].rr.pop();
+        wait_time = wait_time + tick;
+        ++scheduled;
       }
       //stop ageing for the executed process
-      cout << "the first choosen p-id is: " << being_processed.p_id << '\n';
+      //cout << "the first choosen p-id is: " << being_processed.p_id << '\n';
       being_processed.trigger_age_up = -(slice*(curr_queue+1));
       processor_slice=0;
     }
 
     //if the processor is occupied: check if its quantum is up and tick its current process down
     else {
-      if(apple < 20) {
-        cout << "p_id of front of queue 1 for 20 ticks: " << queues[0].rr.front().p_id << " at tick: " << tick << '\n';
+      /*if(apple < 20) {
+        cout << "p_id of front of queue 0 for 20 ticks: " << queues[0].rr.front().p_id << " at tick: " << tick << '\n';
+        cout << " -- p_id of front of queue 1 for 20 ticks: " << queues[1].rr.front().p_id << " at tick: " << tick << '\n';
+        cout << " ---- p_id of front of queue 2 for 20 ticks: " << queues[2].rr.front().p_id << " at tick: " << tick << '\n';
         ++apple;
-      }
+      }*/
       //cout << "how many times do i get run? (should be 5)" << '\n';
       //tickle the current process:
       //cout << "actually being processed: " << being_processed.p_id << '\n';
       being_processed.trigger_age_up += 1;
       being_processed.timeleft = being_processed.timeleft - 1;
       ++processor_slice;
-      if(processor_slice == slice*curr_queue) {
-        //age up
-        //demote
-        cout << "demoted: " << being_processed.p_id << '\n';
-        cout << "front of queue before demotion... " << queues[0].rr.front().p_id << '\n'; 
-        demote(queues, &q3, tick, curr_queue, &being_processed);
-      }
-      //cout << being_processed.timeleft << '\n';
+      cout << " ------------ process: " << being_processed.p_id << " timeleft is: " << being_processed.timeleft << '\n';
+      //cout << "time slice: " << slice*(curr_queue+1) << " processor time: " << processor_slice << '\n';
       if(being_processed.timeleft == 0) {
-        cout << "ever true?" << '\n';
+        cout << "process: " << being_processed.p_id << " finished in queue: " << curr_queue << '\n';
+        //cout << "ever true?" << '\n';
         processing=false;
         --process_count;
       }
+      else if(processor_slice == slice*(curr_queue+1)) { //process didn't finish its burst/timeleft
+        //age up
+        ageing(queues, &q3, tick);
+        //demote
+        //cout << "demoted: " << being_processed.p_id << '\n';
+        //cout << "front of queue before demotion... " << queues[0].rr.front().p_id << '\n';
+        //cout << "process being demoted: " << being_processed.p_id << '\n'; 
+        being_processed.trigger_age_up = (ageing_time + tick);
+        if(curr_queue < 2){
+          demote(queues, &q3, tick, curr_queue, &being_processed);
+        } 
+        if(curr_queue == 2) {
+          q3.fcfs.push(being_processed);
+          cout << "pushed: " << being_processed.p_id << " back onto fcfs" << '\n'; 
+        }
+        processing=false;
+      }
+      //cout << being_processed.timeleft << '\n';
+      
     }
 
     /* for maximum frustration... leave this FUCKING block of code uncommented while debugging!
@@ -257,5 +300,12 @@ int main() {
     //increment tick...
     ++tick;
   }
+  cout << "process count is: " << process_count << '\n';
+  cout << "queues at completion: " << '\n';
+  cout << queues[0].rr.size() << '\n';
+  cout << queues[1].rr.size() << '\n';
+  cout << q3.fcfs.size() << '\n';
+  cout << "----------------------------------------------" << '\n';
+  cout << "Average wait time is: " << (wait_time/scheduled) << " seconds." << '\n';
   cout << "We done foo, total ticks are: " << tick << '\n';
 }
