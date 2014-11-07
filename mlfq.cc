@@ -3,6 +3,10 @@
 #include <stdbool.h>
 #include <queue>
 #include <vector>
+#include <math.h>
+#include <sstream>
+#include <string>
+#include <fstream>
 
 using namespace std;
 
@@ -150,15 +154,52 @@ int main() {
   bool pending_arrival = true;
   int curr_queue=0;
   int tick=0;
-  process being_processed;
+  process being_processed; // a tmp process we use in multiple spots
+  vector<process> arrivals;
+  int process_count=0;
 
+  fstream myfile ("10_processes"); 
+  int count=0;
+  string buf;
+  string line;
+  int c=0;
+
+  if (myfile.is_open()) {
+    while (!myfile.eof()) {
+      getline (myfile,line);
+      stringstream ss(line);
+      string tokens[6];
+      count=0;
+      c++;
+      while (ss >> buf) {
+        tokens[count] = buf;
+        cout << buf << '\n';
+        count++;
+      }
+      if(c > 1) {
+        being_processed.p_id=atoi(tokens[0].c_str());
+        being_processed.burst=atoi(tokens[1].c_str());
+        being_processed.arrival=atoi(tokens[2].c_str());
+        being_processed.priority=atoi(tokens[3].c_str());
+        being_processed.timeleft=atoi(tokens[1].c_str()); //super redundant i know...
+        being_processed.trigger_age_up=0;
+        ++process_count;
+        arrivals.push_back(being_processed);
+      }
+    }
+  } else cout << "Unable to open file"; 
+  
   rr_queue q1; q1.quantum = slice;
   rr_queue q2; q2.quantum = (slice*2);
   fcfs_queue q3; q3.quantum = (slice*3);
   num_queues = 2;
   ageing_time = 40;
    
-
+  cout << "processes: " << '\n';
+  for(vector<process>::iterator i=arrivals.begin(); i<arrivals.end(); ++i) {
+    cout << i->p_id << '\n';
+  }
+  cout << "----------" << '\n';
   //array to hold our ready queues
   rr_queue queues[2] = {q1, q2};
 
@@ -168,17 +209,17 @@ int main() {
   process p3 = {4, 200, 15, 3, 200, 0};
   process p4 = {5, 130, 15, 8, 130, 0};
   
-  vector<process> arrivals(5);
+  /*vector<process> arrivals(5);
   arrivals[0] = p0;
   arrivals[1] = p1;
   arrivals[2] = p2;
   arrivals[3] = p3;
   arrivals[4] = p4;
-  int process_count = 5;
+  int process_count = 5;*/
   int apple=0;
   sort (arrivals.begin(), arrivals.end(), myfunction);
   vector<process> chunk_to_arrive;
-
+  cout << "do we start?" << '\n';
   //while master vector still has processes to be pushed to the ready queue
   while(process_count != 0) {
     //cout << "amount of processes to process left: " << process_count << '\n';
@@ -228,19 +269,20 @@ int main() {
           //cout << "lol " << queues[curr_queue].rr.front().p_id << '\n';
           //cout << "being_processed found: " << being_processed.p_id << '\n';
           queues[curr_queue].rr.pop();
+          wait_time = wait_time + tick;
+        ++scheduled;
         }
         ++temp;
         //cout << "stevenson hates do while loops" << '\n';
       } while((temp<(num_queues-1)) or processing != true);
       //cout << "did i make it out?" << '\n';
       if(!processing) {
-        //cout << "hell ya i did!" << '\n';
+       //disturbingly... this block of code is never actually used... it handles the fcfs queue scheduling so... idk whats going on! 
         curr_queue = num_queues;
         processing = true;
         being_processed = queues[curr_queue].rr.front();
         queues[curr_queue].rr.pop();
-        wait_time = wait_time + tick;
-        ++scheduled;
+        
       }
       //stop ageing for the executed process
       //cout << "the first choosen p-id is: " << being_processed.p_id << '\n';
@@ -262,10 +304,10 @@ int main() {
       being_processed.trigger_age_up += 1;
       being_processed.timeleft = being_processed.timeleft - 1;
       ++processor_slice;
-      cout << " ------------ process: " << being_processed.p_id << " timeleft is: " << being_processed.timeleft << '\n';
+      //cout << " ------------ process: " << being_processed.p_id << " timeleft is: " << being_processed.timeleft << '\n';
       //cout << "time slice: " << slice*(curr_queue+1) << " processor time: " << processor_slice << '\n';
       if(being_processed.timeleft == 0) {
-        cout << "process: " << being_processed.p_id << " finished in queue: " << curr_queue << '\n';
+        //cout << "process: " << being_processed.p_id << " finished in queue: " << curr_queue << '\n';
         //cout << "ever true?" << '\n';
         processing=false;
         --process_count;
@@ -283,7 +325,7 @@ int main() {
         } 
         if(curr_queue == 2) {
           q3.fcfs.push(being_processed);
-          cout << "pushed: " << being_processed.p_id << " back onto fcfs" << '\n'; 
+          //cout << "pushed: " << being_processed.p_id << " back onto fcfs" << '\n'; 
         }
         processing=false;
       }
@@ -304,8 +346,10 @@ int main() {
   cout << "queues at completion: " << '\n';
   cout << queues[0].rr.size() << '\n';
   cout << queues[1].rr.size() << '\n';
-  cout << q3.fcfs.size() << '\n';
+  cout << queues[2].rr.size() << '\n';
+  //cout << q3.fcfs.size() << '\n';
   cout << "----------------------------------------------" << '\n';
   cout << "Average wait time is: " << (wait_time/scheduled) << " seconds." << '\n';
+  cout << "wait time: " << wait_time << " scheduled: " << scheduled << '\n';
   cout << "We done foo, total ticks are: " << tick << '\n';
 }
