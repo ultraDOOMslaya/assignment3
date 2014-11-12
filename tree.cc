@@ -111,16 +111,20 @@ node* remove(node* p, int k) // deleting k key from p tree
 
 int main() {
 
-	struct node *start = insert(NULL, 27);
-	insert(start, 22);
+	struct node *start = insert(NULL, 99);
+	/*insert(start, 22);
 	insert(start, 50);
 	insert(start, 71);
 	insert(start, 72);
 	insert(start, 25);
-  insert(start, 22);
+  insert(start, 22);*/
+  for(int i=99; i>0; --i) {
+    insert(start, i);
+  }
 	cout << start->key << '\n';
-	cout << start->left->left->key << '\n';
+  cout << start->left->key << " " << start->right->key << '\n';
+	cout << start->left->left->key << " " << start->left->right->key << " " << start->right->left->key << " " << start->right->right->key << '\n';
 
 
-	cout << start->left->key << '\n';
+	
 }

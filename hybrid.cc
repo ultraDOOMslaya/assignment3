@@ -14,6 +14,7 @@ int num_queues=0;
 int ageing_time=0;
 float scheduled=0;
 float wait_time=0;
+int slice;
 
 typedef struct process {
   int p_id;
@@ -22,11 +23,12 @@ typedef struct process {
   int priority;
   int absolute;
   int timeleft;
+  bool upper;
   int io;
   int trigger_age_up;
 }process;
 
-struct node{
+struct node{ //IN ORDER TO UNDERSTAND RECURSION... YOU MUST UNDERSTAND RECURSION...
     int key;
     queue<process> rr;
     unsigned char height;
@@ -55,28 +57,33 @@ void fixheight(node* p)
     unsigned char hr = height(p->right);
     p->height = (hl>hr?hl:hr)+1;
 }
-node* findKey(node* tree, int key) {
-  bool found = false;
-  if(tree != NULL) {
-    while(!found) {
-      if(tree->key > key) {
-        tree = tree->left;
-      } else if(tree->key < key) {
-        tree = tree->right;
-      } else if(tree->key == key) {
-        found = true;
-      }
-    }
-  return tree; 
-}
 
-node* findMax(node* max_node) {
-  if(max_node != NULL) {
-    while(max_node->right != NULL) {
-      max_node = max_node->right;
+struct node* findKey(node* tree, int key) {
+  if(tree != 0) {
+    if(tree->key == key) {
+      cout << "matched node: " << tree->key << " with key: " << key << '\n';
+      return tree;
+    } else if(tree->key > key) {
+      cout << "node was greater at: " << tree->key << " than key at: " << key << '\n';
+      return findKey(tree->left, key);
+    } else {
+      cout << "node is less than at: " << tree->key << " with key of: " << key << '\n';
+      return findKey(tree->right, key);
     }
   }
-  return max_node;
+} 
+
+process  findMax(queue<process>* run_queue) {
+  process start_process;
+  for(int i=99; i>0; --i) {
+    if(run_queue[i].size() > 0) {
+      cout << run_queue[i].size() << '\n';
+      start_process = run_queue[i].front();
+      run_queue[i].pop();
+      
+      return start_process;
+    }
+  }
 }
 
 node* rotateright(node* p)
@@ -119,14 +126,11 @@ node* balance(node* p) // balancing the p node
 
 node* insert(node* p, int k) // insert k key in a tree with p root
 {
-    if( !p ) {
-      node* new_node = new node(k);
-      return new_node;
-    }
+    if( !p ) return new node(k);
     if( k<p->key )
-        p->left = insert(p->left,k,pr);
+        p->left = insert(p->left,k);
     else
-        p->right = insert(p->right,k,pr);
+        p->right = insert(p->right,k);
     return balance(p);
 }
 
@@ -193,7 +197,6 @@ void usedUp(vector<process> *done, vector<process> *chunk_to_arrive) {
     cout << (processes->begin()+1)->p_id << '\n';
     cout << "--- ---" << '\n';
   } */
-
 //method for sorting process structs based on arrival time
 static bool myfunction (const process &x, const process &y) { return (x.arrival < y.arrival); }
 
@@ -210,32 +213,41 @@ static bool sortArrivals (const process &x, const process &y) {
 void organizeArrivals(vector<process> *chunk_to_arrive) {
   sort (chunk_to_arrive->begin(), chunk_to_arrive->end(), sortArrivals);
 }
-
-void sleuthIO(vector<process> *wait_queue, node* p) {
-  if(wait_queue->size() > 0) {
-    for(vector<process>::iterator i=wait_queue->begin(); i!=wait_queue->end(); ++i) {
-      if(i->timeleft == 0) {
-        i->priority += i->io;
-        if(i->priority > 99) {
-          i->priority = 99;
-          if(i->absolute < 50) {
-            i->priority = 49;
-          }
-        } 
-        if(i->priority > 49) {
-          if(i->absolute < 50) {
-            i->priority = 49;
-          }
-        } 
-        insert(p, i->priority, *i);
-        i = wait_queue->erase(i);
-      }
-    } 
+void promo(queue<process>* run_queue, int tick) {
+  for(int i=0; i<100; ++i) {
+    if( 
   }
 }
 
-void demote(process p, node* head) {
-  //p->priority-
+void sleuthIO(vector<process> wait_queue, queue<process>* run_queue ) {
+  int count;
+  for(vector<process>::iterator i=wait_queue.begin(); i!=wait_queue.end(); ++i) {
+    if(i->timeleft == 0) {
+      i->priority += i->io;
+      if(i->upper) {
+        if(i->priority > 99) {
+          i->priority = 99;
+        }
+      } else {
+        if(i->priority > 49) {
+          i->priority = 49;
+        }
+      }
+      run_queue->push(*i);
+      wait_queue.erase(wait_queue.begin()+count);
+    } else {
+      --i->timeleft;
+    }
+    count++;
+  }
+}
+
+void demote(process being_processed, queue<process>* run_queue) {
+  being_processed.priority -= slice;
+  if(being_processed.priority < being_processed.absolute) {
+    being_processed.priority = being_processed.absolute; 
+  }
+  run_queue[being_processed.priority].push(being_processed);   
 }
 
 int main() {
@@ -243,7 +255,8 @@ int main() {
   //int scheduled;
   //int wait_time;
   bool start = true;
-  int slice = 8;
+  bool queued = false;
+  slice = 8;
   int processor_slice=0;
   bool processing = false;
   bool pending_arrival = true;
@@ -251,6 +264,8 @@ int main() {
   process being_processed; // a tmp process we use in multiple spots
   vector<process> arrivals;
   vector<process> wait_queue;
+  //vector<queue<process> > run_queue;
+  queue<process> run_queue[100];
   int process_count=0;
   struct node *rr_tree;
   struct node *curr_node;
@@ -280,7 +295,7 @@ int main() {
         being_processed.arrival=atoi(tokens[2].c_str());
         being_processed.priority=atoi(tokens[3].c_str());
         being_processed.io=atoi(tokens[5].c_str()); 
-        being_processed.absolute-atoi(tokens[3].c_str());
+        being_processed.absolute=atoi(tokens[3].c_str());
         being_processed.trigger_age_up=0;
         ++process_count;
         arrivals.push_back(being_processed);
@@ -315,81 +330,94 @@ int main() {
   }
   
   //make 100 nodes with 100 queues
-  rr_tree = insert(NULL, 0);
-  for(int num_nodes=1; num_nodes<100; ++num_nodes) {
+ /* for(int num_nodes=0; num_nodes<100; ++num_nodes) {
     insert(rr_tree, num_nodes);
-  }
- 
-  cout << "----------" << '\n';
-  //while master vector still has processes to be pushed to the ready queue
+    cout << "inserted: " << num_nodes << '\n';
+    cout << "head is: " << rr_tree->key << '\n';
+  }*/
+      
   while(process_count != 0) {
     //cout << "amount of processes to process left: " << process_count << '\n';
-      while(iter->arrival == tick) { 
-        if(start) {
-          int key = iter->priority;
-          rr_tree = insert(NULL, key, *iter);
-          head->top = rr_queue;
-          start = false;
-          cout << "started by pushing: " << rr_tree->rr->p_id << '\n';
-          cout << "-----------------" << '\n';
-        } else {
-          cout << "what were pushin... " << iter->p_id << " with burst of: " << iter->timeleft << " and a priority of: " << iter->priority << '\n';
-          int key = iter->priority;
-          insert(rr_queue, key, *iter);
-          
-          cout << "clock tick when we push to the queue: " << tick << '\n';
-          cout << "_________________" << '\n';
-        }
-      //chunk_to_arrive.clear();
-      ++iter;
+    if(arrivals.size() != 0) {
+      if(arrivals.begin()->arrival == tick) {
+        pending_arrival = true;
+        steal(&arrivals, &chunk_to_arrive);
+        organizeArrivals(&chunk_to_arrive);
+      } else {
+        pending_arrival = false;
       }
-      /*
-      //if tree isn't empty start processing
-      if(!processing) {
-        //if the tree has a size
-        if(rr_queue != NULL) {
-          curr_node = findMax(rr_queue);
-          being_processed = *curr_node->rr;
-          remove(rr_queue, being_processed.priority);
-          processing = true;
-        }
-      }
+    } else if(arrivals.size() == 0 and pending_arrival == true) {
+      pending_arrival = false;
+    }
 
-      //
-      if(processing) {
-        if(processor_slice == slice) {
-          // check for clock interrupt
-          if(being_processed.burst > 0) {
-            demote(being_processed, rr_queue);
-          }
-        } else if(processor_slice == (slice-1)) {
-        // check for io
-          if(being_processed.io > 0) {
-            being_processed.timeleft = being_processed.io;
-            wait_queue.push_back(being_processed);
-            processing = false;
-          }  
-        } else {
-          being_processed.burst;
-          //continue processing
-          if(being_processed.burst <= 0) {
-            processing = false;
-            --process_count;
-          } else {
-            being_processed.burst -= 1;
-          }
+    //cout << "about to pend" << '\n';
+    if(pending_arrival) {
+      for(vector<process>::iterator it=chunk_to_arrive.begin(); it!=chunk_to_arrive.end(); ++it) {
+        cout << "get here1" << '\n';
+        if(it->absolute > 49) {
+          it->upper = true;
         }
-        sleuthIO(&wait_queue, rr_queue);
+        run_queue[it->priority].push(*it);
+        cout << "key for item just added to queue at leaf node: " << '\n';
+        //cout << rr_tree->rr.front().p_id << '\n';
+      } 
+      cout << "clock tick when we push to the queue: " << tick << '\n';
+      cout << "_________________" << '\n';
+      chunk_to_arrive.clear();
+    }
+      
+    //if tree isn't empty start processing
+    if(pending_arrival) {
+      if(!processing and !queued) {
+        cout << "about to set a process" << '\n';
+        //find the highest priority with a size > 0  
+        cout << "get b" << '\n';
+        being_processed = findMax(run_queue);
+        processing = true;
+        cout << being_processed.p_id << '\n'; 
       }
-      /*
+    } else if(!processing and queued) {
+        
+    }
+    
+      
+      //
+    if(processing) {
+      if(processor_slice == slice) {
+        // check for clock interrupt
+        if(being_processed.burst > 0) {
+          demote(being_processed, run_queue);
+        }
+      } else if(processor_slice == (slice-1)) {
+        // check for io
+        if(being_processed.io > 0) {
+          being_processed.timeleft = being_processed.io;
+          wait_queue.push_back(being_processed);
+          processing = false;
+        }  
+      } else {
+        --being_processed.burst;
+        //continue processing
+        if(being_processed.burst <= 0) {
+          processing = false;
+          --process_count;
+        } else {
+          being_processed.burst -= 1;
+        }
+      }
+      sleuthIO(wait_queue, run_queue);
+    }
+    
+    promo(run_queue);
+  
     ++tick;
     if(tick == 8000) {
       break;
     }
-  }
+  }/*
   cout << "We done foo, total ticks are: " << tick << '\n';
   cout << head->top->key << '\n';
   cout << rr_queue->left->key << " " << rr_queue->right->key << '\n';
   cout  << " " << rr_queue->right->left->key << " " << rr_queue->right->right->key << '\n';
-  cout << "       " << " " << rr_queue->right->right->left->key << '\n'; 
+  cout << "       " << " " << rr_queue->right->right->left->key << '\n';*/ 
 }
