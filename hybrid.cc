@@ -38,8 +38,9 @@ struct node{ //IN ORDER TO UNDERSTAND RECURSION... YOU MUST UNDERSTAND RECURSION
     node(int k) { key = k; left = right = 0; height = 1; }
 };
 
-struct root{
-  node* top;
+typedef struct gannt{
+  int timespent;
+  int p_id;
 };
 
 unsigned char height(node* p)
@@ -78,7 +79,7 @@ process  findMax(queue<process>* run_queue) {
   process start_process;
   for(int i=99; i>0; --i) {
     if(run_queue[i].size() > 0) {
-      cout << "total run queue size is: " << run_queue[i].size() << '\n';
+      //cout << "total run queue size is: " << run_queue[i].size() << '\n';
       start_process = run_queue[i].front();
       run_queue[i].pop();
       
@@ -231,12 +232,11 @@ int promoProcess(process *p) {
 }
 
 void promo(queue<process>* run_queue, int tick, int curr_priority) {
-  cout << "THOU SHALT BE PROMOTED!" << '\n';
   process tmp;
   for(int i=curr_priority; i>0; --i) {
     if(run_queue[i].size() > 0) {
       while(run_queue[i].front().trigger_age_up == tick and run_queue[i].size() > 0) {
-        cout << "stuck in promos?" << '\n';
+        //cout << "stuck in promos?" << '\n';
         tmp = run_queue[i].front();
         run_queue[i].pop();
         tmp.priority = promoProcess(&tmp);
@@ -283,7 +283,7 @@ void sleuthIO(queue<process>* wait_queue, queue<process>* run_queue) {
   tmp = wait_queue->front();
   wait_queue->pop();
   if(tmp.timeleft == 0) {
-      cout << "----- from the sleuthing: " << tmp.timeleft << '\n'; 
+      //cout << "----- from the sleuthing: " << tmp.timeleft << '\n'; 
       tmp.priority += tmp.io;
       if(tmp.upper) {
         if(tmp.priority > 99) {
@@ -294,7 +294,6 @@ void sleuthIO(queue<process>* wait_queue, queue<process>* run_queue) {
           tmp.priority = 49;
         }
       }
-      cout << "do you die here?" << '\n';
       run_queue[tmp.priority].push(tmp);
     } else {
       tmp.timeleft =  tmp.timeleft - 1;
@@ -306,9 +305,9 @@ void sleuthIO(queue<process>* wait_queue, queue<process>* run_queue) {
 }
 
 void demote(process being_processed, queue<process>* run_queue) {
-  cout << "_______________" << '\n';
-  cout << being_processed.p_id << " was demoted." << '\n';
-  cout << "---------------" << '\n';
+  //cout << "_______________" << '\n';
+  //cout << being_processed.p_id << " was demoted." << '\n';
+  //cout << "---------------" << '\n';
   being_processed.priority -= slice;
   if(being_processed.priority < being_processed.absolute) {
     being_processed.priority = being_processed.absolute; 
@@ -317,13 +316,18 @@ void demote(process being_processed, queue<process>* run_queue) {
   run_queue[being_processed.priority].push(being_processed);   
 }
 
+void makeChart(vector<gannt> chart) {
+  
+}
+
 int main() {
 
   //int scheduled;
   //int wait_time;
   bool start = true;
   bool queued = false;
-  slice = 8;
+  cout << "Enter a time slice: " << '\n';
+  cin >>  slice;
   int processor_slice=0;
   bool processing = false;
   bool pending_arrival = true;
@@ -344,13 +348,21 @@ int main() {
   int avg_wait_time=0;
   int total_process;
   int turnaround=0;
+  int NP=-1;
+  vector<gannt> chart;
+  gannt cycle;
 
-  fstream myfile ("100k_processes"); 
+  //fstream myfile ("100k_processes"); 
   int count=0;
   string buf;
   string line;
   int c=0;
-
+  
+  string infile;
+  cout << "Enter the name of the file: " << '\n';
+  cin >> infile;
+  fstream myfile (infile.c_str());
+ 
   if (myfile.is_open()) {
     while (!myfile.eof()) {
       getline (myfile,line);
@@ -373,20 +385,20 @@ int main() {
         being_processed.absolute=atoi(tokens[3].c_str());
         being_processed.trigger_age_up=0;
         ++process_count;
-        cout << being_processed.p_id << " ";
+        //cout << being_processed.p_id << " ";
         
       }
       if(being_processed.p_id<0){
         being_processed.p_id *= -1;
-        cout << being_processed.p_id << '\n';
+        //cout << being_processed.p_id << '\n';
       }
       if(being_processed.burst<0){
         being_processed.burst *= -1;
-        cout << being_processed.p_id << '\n';
+        //cout << being_processed.p_id << '\n';
       }
       if(being_processed.burst_time<0){
         being_processed.burst_time *= -1;
-        cout << being_processed.p_id << '\n';
+        //cout << being_processed.p_id << '\n';
       }
       if(being_processed.arrival<0){
         being_processed.arrival *= -1;
@@ -401,10 +413,10 @@ int main() {
         being_processed.priority *= -1;
       }
       arrivals.push_back(being_processed);
-      cout << being_processed.p_id << " was added" << '\n';
+      //cout << being_processed.p_id << " was added" << '\n';
     }
   } else cout << "Unable to open file"; 
-  cout << '\n';
+  //cout << '\n';
   
   total_process = process_count;
   /*cout << "processes: " << '\n';
@@ -427,10 +439,10 @@ int main() {
   sort (arrivals.begin(), arrivals.end(), myfunction);
   vector<process>::iterator iter=arrivals.begin();
   vector<process> chunk_to_arrive;
-  for(vector<process>::iterator i=arrivals.begin(); i<arrivals.end(); ++i) {
+  /*for(vector<process>::iterator i=arrivals.begin(); i<arrivals.end(); ++i) {
     cout << i->p_id << '\n';
     cout << "and io " << i->io << '\n';
-  }
+  }*/
   
   //make 100 nodes with 100 queues
  /* for(int num_nodes=0; num_nodes<100; ++num_nodes) {
@@ -460,6 +472,7 @@ int main() {
         if(it->absolute > 49) {
           it->upper = true;
         }
+        NP = NP + 1;
         run_queue[it->priority].push(*it);
         //cout << "key for item just added to queue at leaf node: " << '\n';
         //cout << rr_tree->rr.front().p_id << '\n';
@@ -480,16 +493,18 @@ int main() {
         not_processing = -8;
         processing = true;
         processor_slice = 0;
+        cycle.p_id = being_processed.p_id;
         //cout << being_processed.p_id << '\n'; 
       }
     } else if(!processing and queued) {
-        cout << "logic error?" << '\n';
+        //cout << "logic error?" << '\n';
        if(run_queue->size() > 0) {
            processing = true;
            being_processed = findMax(run_queue);
            not_processing = -8;
            processing = true;
            processor_slice = 0;
+           cycle.p_id = being_processed.p_id;
        } 
        queued = false;
     } else if(!processing and (run_queue->size() > 0)) {
@@ -498,6 +513,7 @@ int main() {
         not_processing = -8;
         processing = true;
         processor_slice = 0; 
+        cycle.p_id = being_processed.p_id;
     }
     
       //
@@ -508,6 +524,8 @@ int main() {
         if(being_processed.burst > 0) {
           demote(being_processed, run_queue);
           processing = false;
+          chart.push_back(cycle);
+          cycle.timespent=0;
         }
       } else if(processor_slice == (slice-1)) {
         // check for io
@@ -516,20 +534,25 @@ int main() {
           wait_queue.push(being_processed);
           queued = true;
           processing = false;
+          chart.push_back(cycle);
+          cycle.timespent=0;
         }  
       } else {
         --being_processed.burst;
+        cycle.timespent++;
         //continue processing or finish when burst is 0
         if(being_processed.burst <= 0) {
           processing = false;
           --process_count;
+          chart.push_back(cycle);
+          cycle.timespent=0;
           if(being_processed.p_id > 0) {
             wait_time = wait_time + ((tick - being_processed.arrival) - being_processed.burst_time);
             
             turnaround = turnaround + (tick - being_processed.arrival);
           }
-          cout << "being processed: " << being_processed.p_id << " finished at clock tick: " << tick << '\n'; 
-          cout << "processes left are: " << process_count << '\n';
+          //cout << "being processed: " << being_processed.p_id << " finished at clock tick: " << tick << '\n'; 
+          //cout << "processes left are: " << process_count << '\n';
         }
       }
       ++processor_slice;
@@ -555,6 +578,10 @@ int main() {
     ++tick;
   }
   cout << "We done foo, total ticks are: " << tick << '\n';
+  cout << '\n';
+  cout << "----- GANNT CHART -----" << '\n';
+  makeChart(chart);
   cout << "Average wait time is:       " << (wait_time/total_process) << '\n';
   cout << "Average turnaround time is: " << (turnaround/total_process) << '\n';
+  cout << "NP is:                      " << NP << '\n';
 }
